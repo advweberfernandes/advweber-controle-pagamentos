@@ -31,3 +31,10 @@
 
 ## Entrega
 - [x] Checkpoint final
+
+## Exportação PDF
+- [x] Instalar biblioteca jsPDF + jspdf-autotable no frontend
+- [x] Criar utilitário generateClientPDF com dados do cliente e parcelas
+- [x] Adicionar botão "Exportar PDF" em cada card de cliente no Carnê Consolidado
+- [x] PDF deve conter: nome do cliente, valor total, tabela de parcelas (número, vencimento, pagamento, status)
+- [x] Testar geração e download do PDF

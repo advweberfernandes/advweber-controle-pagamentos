@@ -1,12 +1,15 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { CheckCircle2, AlertCircle, Clock, Search, BookOpen } from "lucide-react";
+import { toast } from "sonner";
+import { CheckCircle2, AlertCircle, Clock, Search, BookOpen, FileDown } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { generateClientPDF } from "@/lib/generatePDF";
 
 function formatCurrency(value: string | number) {
   const num = typeof value === "string" ? parseFloat(value) : value;
@@ -40,7 +43,9 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function CarnePage() {
   const [search, setSearch] = useState("");
+  const [exportingId, setExportingId] = useState<number | null>(null);
   const { data: rows, isLoading } = trpc.installments.carne.useQuery();
+  const { data: clients } = trpc.clients.list.useQuery();
 
   // Agrupar por cliente
   const grouped = useMemo(() => {
@@ -76,6 +81,59 @@ export default function CarnePage() {
     };
   }, [rows]);
 
+  function handleExportPDF(group: typeof grouped[0]) {
+    setExportingId(group.clientId);
+    try {
+      // Buscar dados completos do cliente
+      const clientData = clients?.find(c => c.id === group.clientId);
+      generateClientPDF({
+        clientName: group.clientName,
+        totalFees: clientData?.totalFees ?? "0",
+        installmentCount: clientData?.installmentCount ?? group.installments.length,
+        installmentValue: clientData?.installmentValue ?? group.installments[0]?.installmentValue ?? "0",
+        startDate: clientData?.startDate ?? group.installments[0]?.dueDate ?? Date.now(),
+        installments: group.installments.map(i => ({
+          installmentNumber: i.installmentNumber,
+          installmentValue: i.installmentValue,
+          dueDate: i.dueDate,
+          paidAt: i.paidAt,
+          status: i.status,
+        })),
+      });
+      toast.success(`PDF do carnê de ${group.clientName} gerado com sucesso!`);
+    } catch (err) {
+      toast.error("Erro ao gerar PDF. Tente novamente.");
+    } finally {
+      setExportingId(null);
+    }
+  }
+
+  function handleExportAllPDF() {
+    if (!filtered.length) return;
+    try {
+      for (const group of filtered) {
+        const clientData = clients?.find(c => c.id === group.clientId);
+        generateClientPDF({
+          clientName: group.clientName,
+          totalFees: clientData?.totalFees ?? "0",
+          installmentCount: clientData?.installmentCount ?? group.installments.length,
+          installmentValue: clientData?.installmentValue ?? group.installments[0]?.installmentValue ?? "0",
+          startDate: clientData?.startDate ?? group.installments[0]?.dueDate ?? Date.now(),
+          installments: group.installments.map(i => ({
+            installmentNumber: i.installmentNumber,
+            installmentValue: i.installmentValue,
+            dueDate: i.dueDate,
+            paidAt: i.paidAt,
+            status: i.status,
+          })),
+        });
+      }
+      toast.success(`${filtered.length} PDF(s) gerado(s) com sucesso!`);
+    } catch {
+      toast.error("Erro ao gerar PDFs.");
+    }
+  }
+
   return (
     <div className="p-6 max-w-6xl mx-auto animate-fade-in-up">
       {/* Header */}
@@ -86,14 +144,27 @@ export default function CarnePage() {
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">Visão completa de todos os clientes e parcelas</p>
         </div>
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar cliente..."
-            className="pl-9"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative w-56">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar cliente..."
+              className="pl-9"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          {!isLoading && filtered.length > 1 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground"
+              onClick={handleExportAllPDF}
+            >
+              <FileDown className="w-4 h-4" />
+              Exportar Todos
+            </Button>
+          )}
         </div>
       </div>
 
@@ -151,24 +222,38 @@ export default function CarnePage() {
           {filtered.map((group) => {
             const paidCount = group.installments.filter(i => i.status === "paid").length;
             const overdueCount = group.installments.filter(i => i.status === "overdue").length;
+            const isExporting = exportingId === group.clientId;
             return (
               <Card key={group.clientId} className="border border-border overflow-hidden">
                 <CardHeader className="pb-0 pt-4 px-4 bg-muted/30 border-b border-border/60">
                   <div className="flex items-center justify-between flex-wrap gap-2 pb-3">
-                    <CardTitle className="text-base font-semibold" style={{ fontFamily: "'Playfair Display', serif" }}>
-                      {group.clientName}
-                    </CardTitle>
-                    <div className="flex gap-2">
-                      {overdueCount > 0 && (
-                        <Badge variant="destructive" className="text-xs gap-1">
-                          <AlertCircle className="w-3 h-3" />
-                          {overdueCount} em atraso
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <CardTitle className="text-base font-semibold" style={{ fontFamily: "'Playfair Display', serif" }}>
+                        {group.clientName}
+                      </CardTitle>
+                      <div className="flex gap-2">
+                        {overdueCount > 0 && (
+                          <Badge variant="destructive" className="text-xs gap-1">
+                            <AlertCircle className="w-3 h-3" />
+                            {overdueCount} em atraso
+                          </Badge>
+                        )}
+                        <Badge variant="secondary" className="text-xs">
+                          {paidCount}/{group.installments.length} pagas
                         </Badge>
-                      )}
-                      <Badge variant="secondary" className="text-xs">
-                        {paidCount}/{group.installments.length} pagas
-                      </Badge>
+                      </div>
                     </div>
+                    {/* Botão Exportar PDF */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2 h-8 text-xs border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground transition-all"
+                      disabled={isExporting}
+                      onClick={() => handleExportPDF(group)}
+                    >
+                      <FileDown className="w-3.5 h-3.5" />
+                      {isExporting ? "Gerando..." : "Exportar PDF"}
+                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
