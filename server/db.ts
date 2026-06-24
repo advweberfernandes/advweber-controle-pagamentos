@@ -204,6 +204,36 @@ export async function getAllInstallmentsWithClients() {
   return rows;
 }
 
+export async function listClientsAlpha() {
+  const db = await getDb();
+  if (!db) return [];
+  // Retorna todos os clientes em ordem alfabética com contagem de parcelas pagas
+  const allClients = await db.select().from(clients).orderBy(asc(clients.name));
+  const result = [];
+  for (const c of allClients) {
+    const insts = await db.select().from(installments).where(eq(installments.clientId, c.id));
+    const paidCount = insts.filter(i => i.status === "paid").length;
+    result.push({ ...c, paidCount, totalInstallments: insts.length });
+  }
+  return result;
+}
+
+export async function markClientSettled(id: number, settledAt: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(clients)
+    .set({ settledAt, updatedAt: new Date() })
+    .where(eq(clients.id, id));
+}
+
+export async function markClientUnsettled(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(clients)
+    .set({ settledAt: null, updatedAt: new Date() })
+    .where(eq(clients.id, id));
+}
+
 export async function syncOverdueInstallments() {
   const db = await getDb();
   if (!db) return;

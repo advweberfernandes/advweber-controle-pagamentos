@@ -33,6 +33,7 @@ export const clients = mysqlTable("clients", {
   installmentValue: decimal("installmentValue", { precision: 10, scale: 2 }).notNull(),
   startDate: bigint("startDate", { mode: "number" }).notNull(), // UTC timestamp ms
   notes: text("notes"),
+  settledAt: bigint("settledAt", { mode: "number" }), // data de adimplemento UTC ms (null = não adimplido)
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

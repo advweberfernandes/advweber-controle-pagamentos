@@ -19,6 +19,9 @@ import {
   updateInstallmentValue,
   getAllInstallmentsWithClients,
   syncOverdueInstallments,
+  listClientsAlpha,
+  markClientSettled,
+  markClientUnsettled,
 } from "./db";
 
 export const appRouter = router({
@@ -99,6 +102,25 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await deleteClient(input.id);
+        return { success: true };
+      }),
+
+    listAlpha: publicProcedure.query(async () => {
+      await syncOverdueInstallments();
+      return listClientsAlpha();
+    }),
+
+    markSettled: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await markClientSettled(input.id, Date.now());
+        return { success: true };
+      }),
+
+    markUnsettled: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await markClientUnsettled(input.id);
         return { success: true };
       }),
 

@@ -49,3 +49,13 @@
 - [x] Frontend: opção de editar data de vencimento de parcela individual na página de detalhe
 - [x] Frontend: opção de editar valor de parcela individual na página de detalhe
 - [x] Frontend: confirmação ao regenerar parcelas (aviso sobre perda de dados de pagamento)
+
+## Aba Lista Alfabética de Clientes
+- [x] Schema: adicionar campo `settledAt` (timestamp nullable) na tabela `clients`
+- [x] Backend: procedure `clients.markSettled` para marcar/desmarcar contrato como adimplido
+- [x] Backend: procedure `clients.listAlpha` retornando clientes em ordem alfabética com resumo de parcelas
+- [x] Frontend: nova página `ClientsListPage.tsx` com lista alfabética, valor de contrato, parcelas pagas e badge de adimplido
+- [x] Frontend: botão/ação para marcar contrato como adimplido com confirmação
+- [x] Frontend: indicador visual distinto para contratos adimplidos (badge verde, linha diferenciada)
+- [x] Frontend: registrar rota `/lista` e adicionar item no menu lateral
+- [x] Checkpoint final da aba lista alfabética

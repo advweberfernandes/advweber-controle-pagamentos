@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import ClientsPage from "./pages/ClientsPage";
 import ClientDetailPage from "./pages/ClientDetailPage";
 import CarnePage from "./pages/CarnePage";
+import ClientsListPage from "./pages/ClientsListPage";
 import DashboardLayout from "./components/DashboardLayout";
 
 function Router() {
@@ -16,6 +17,7 @@ function Router() {
         <Route path="/" component={ClientsPage} />
         <Route path="/clientes/:id" component={ClientDetailPage} />
         <Route path="/carne" component={CarnePage} />
+        <Route path="/lista" component={ClientsListPage} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>
