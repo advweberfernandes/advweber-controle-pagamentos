@@ -38,3 +38,14 @@
 - [x] Adicionar botão "Exportar PDF" em cada card de cliente no Carnê Consolidado
 - [x] PDF deve conter: nome do cliente, valor total, tabela de parcelas (número, vencimento, pagamento, status)
 - [x] Testar geração e download do PDF
+
+## Edição de Carnês
+- [x] Backend: procedure clients.update (editar nome, honorários, observações)
+- [x] Backend: procedure installments.updateDueDate (editar data de vencimento de parcela individual)
+- [x] Backend: procedure installments.updateValue (editar valor de parcela individual)
+- [x] Backend: procedure clients.regenerateInstallments (regenerar todas as parcelas ao alterar contagem/valor/data início)
+- [x] Frontend: botão "Editar" no card de cliente na lista de clientes
+- [x] Frontend: modal de edição de cliente com campos editáveis
+- [x] Frontend: opção de editar data de vencimento de parcela individual na página de detalhe
+- [x] Frontend: opção de editar valor de parcela individual na página de detalhe
+- [x] Frontend: confirmação ao regenerar parcelas (aviso sobre perda de dados de pagamento)

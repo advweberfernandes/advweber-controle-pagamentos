@@ -9,10 +9,14 @@ import {
   createClient,
   createClientAndGetId,
   deleteClient,
+  updateClient,
+  deleteInstallmentsByClientId,
   createInstallments,
   getInstallmentsByClientId,
   markInstallmentPaid,
   markInstallmentUnpaid,
+  updateInstallmentDueDate,
+  updateInstallmentValue,
   getAllInstallmentsWithClients,
   syncOverdueInstallments,
 } from "./db";
@@ -97,6 +101,51 @@ export const appRouter = router({
         await deleteClient(input.id);
         return { success: true };
       }),
+
+    update: publicProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().min(1).optional(),
+          totalFees: z.number().positive().optional(),
+          installmentCount: z.number().int().min(1).max(120).optional(),
+          installmentValue: z.number().positive().optional(),
+          startDate: z.number().optional(),
+          notes: z.string().nullable().optional(),
+          regenerateInstallments: z.boolean().optional(), // se true, recria todas as parcelas
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { id, regenerateInstallments, ...fields } = input;
+        const updateData: Parameters<typeof updateClient>[1] = {};
+        if (fields.name !== undefined) updateData.name = fields.name;
+        if (fields.totalFees !== undefined) updateData.totalFees = String(fields.totalFees);
+        if (fields.installmentCount !== undefined) updateData.installmentCount = fields.installmentCount;
+        if (fields.installmentValue !== undefined) updateData.installmentValue = String(fields.installmentValue);
+        if (fields.startDate !== undefined) updateData.startDate = fields.startDate;
+        if (fields.notes !== undefined) updateData.notes = fields.notes;
+
+        await updateClient(id, updateData);
+
+        if (regenerateInstallments) {
+          // Buscar dados atualizados do cliente
+          const client = await getClientById(id);
+          if (!client) throw new Error("Cliente não encontrado");
+          // Remover parcelas antigas e recriar
+          await deleteInstallmentsByClientId(id);
+          const now = Date.now();
+          const installmentsData = Array.from({ length: client.installmentCount }, (_, i) => {
+            const dueDate = new Date(client.startDate);
+            dueDate.setMonth(dueDate.getMonth() + i);
+            const dueDateMs = dueDate.getTime();
+            const status: "pending" | "overdue" = dueDateMs < now ? "overdue" : "pending";
+            return { clientId: id, number: i + 1, dueDate: dueDateMs, paidAt: null, status };
+          });
+          await createInstallments(installmentsData);
+        }
+
+        return { success: true };
+      }),
   }),
 
   installments: router({
@@ -119,6 +168,20 @@ export const appRouter = router({
       await syncOverdueInstallments();
       return getAllInstallmentsWithClients();
     }),
+
+    updateDueDate: publicProcedure
+      .input(z.object({ id: z.number(), dueDate: z.number() }))
+      .mutation(async ({ input }) => {
+        await updateInstallmentDueDate(input.id, input.dueDate);
+        return { success: true };
+      }),
+
+    updateValue: publicProcedure
+      .input(z.object({ id: z.number(), value: z.number().positive() }))
+      .mutation(async ({ input }) => {
+        await updateInstallmentValue(input.id, String(input.value));
+        return { success: true };
+      }),
   }),
 });
 

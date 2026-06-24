@@ -5,15 +5,25 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useState } from "react";
-import { ArrowLeft, CheckCircle2, AlertCircle, Clock, CheckCheck, RotateCcw } from "lucide-react";
+import { ArrowLeft, CheckCircle2, AlertCircle, Clock, CheckCheck, RotateCcw, CalendarDays } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 function formatCurrency(value: string | number) {
   const num = typeof value === "string" ? parseFloat(value) : value;
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(num);
+}
+
+function toDateInputValue(ts: number) {
+  const d = new Date(ts);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -45,8 +55,12 @@ export default function ClientDetailPage() {
   const params = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const clientId = parseInt(params.id ?? "0");
+
   const [confirmPayId, setConfirmPayId] = useState<number | null>(null);
   const [confirmUnpayId, setConfirmUnpayId] = useState<number | null>(null);
+  // Edição de data de vencimento individual
+  const [editDueDateInst, setEditDueDateInst] = useState<{ id: number; current: number; number: number } | null>(null);
+  const [newDueDate, setNewDueDate] = useState("");
 
   const utils = trpc.useUtils();
   const { data, isLoading } = trpc.clients.getById.useQuery({ id: clientId });
@@ -73,6 +87,24 @@ export default function ClientDetailPage() {
     onError: (err) => toast.error("Erro: " + err.message),
   });
 
+  const updateDueDateMutation = trpc.installments.updateDueDate.useMutation({
+    onSuccess: () => {
+      toast.success("Data de vencimento atualizada!");
+      utils.clients.getById.invalidate({ id: clientId });
+      utils.installments.carne.invalidate();
+      setEditDueDateInst(null);
+      setNewDueDate("");
+    },
+    onError: (err) => toast.error("Erro ao atualizar: " + err.message),
+  });
+
+  function handleUpdateDueDate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editDueDateInst || !newDueDate) return;
+    const ts = new Date(newDueDate + "T12:00:00").getTime();
+    updateDueDateMutation.mutate({ id: editDueDateInst.id, dueDate: ts });
+  }
+
   if (isLoading) {
     return (
       <div className="p-6 max-w-4xl mx-auto space-y-4">
@@ -97,7 +129,6 @@ export default function ClientDetailPage() {
   const installments = data.installments ?? [];
   const paid = installments.filter(i => i.status === "paid").length;
   const overdue = installments.filter(i => i.status === "overdue").length;
-  const pending = installments.filter(i => i.status === "pending").length;
   const progress = installments.length > 0 ? (paid / installments.length) * 100 : 0;
 
   return (
@@ -168,9 +199,14 @@ export default function ClientDetailPage() {
       {/* Tabela de parcelas */}
       <Card className="border border-border">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base" style={{ fontFamily: "'Playfair Display', serif" }}>
-            Parcelas
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base" style={{ fontFamily: "'Playfair Display', serif" }}>
+              Parcelas
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Clique em <CalendarDays className="inline w-3 h-3" /> para editar a data de vencimento
+            </p>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -181,7 +217,7 @@ export default function ClientDetailPage() {
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Vencimento</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Pagamento</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Ação</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -197,8 +233,24 @@ export default function ClientDetailPage() {
                     <td className="px-4 py-3 font-medium">
                       {inst.number}ª parcela
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {format(new Date(inst.dueDate), "dd/MM/yyyy", { locale: ptBR })}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground">
+                          {format(new Date(inst.dueDate), "dd/MM/yyyy", { locale: ptBR })}
+                        </span>
+                        {inst.status !== "paid" && (
+                          <button
+                            title="Editar data de vencimento"
+                            className="text-muted-foreground hover:text-primary transition-colors p-0.5 rounded"
+                            onClick={() => {
+                              setEditDueDateInst({ id: inst.id, current: inst.dueDate, number: inst.number });
+                              setNewDueDate(toDateInputValue(inst.dueDate));
+                            }}
+                          >
+                            <CalendarDays className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       {inst.paidAt ? (
@@ -290,6 +342,37 @@ export default function ClientDetailPage() {
               {markUnpaidMutation.isPending ? "Desfazendo..." : "Desfazer"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal editar data de vencimento */}
+      <Dialog open={!!editDueDateInst} onOpenChange={(v) => { if (!v) { setEditDueDateInst(null); setNewDueDate(""); } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle style={{ fontFamily: "'Playfair Display', serif" }}>
+              Editar Vencimento — {editDueDateInst?.number}ª Parcela
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdateDueDate} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="newDueDate">Nova data de vencimento</Label>
+              <Input
+                id="newDueDate"
+                type="date"
+                value={newDueDate}
+                onChange={e => setNewDueDate(e.target.value)}
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => { setEditDueDateInst(null); setNewDueDate(""); }}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={updateDueDateMutation.isPending}>
+                {updateDueDateMutation.isPending ? "Salvando..." : "Salvar"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

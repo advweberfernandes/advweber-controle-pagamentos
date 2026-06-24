@@ -92,6 +92,30 @@ export async function deleteClient(id: number) {
   await db.delete(clients).where(eq(clients.id, id));
 }
 
+export async function updateClient(
+  id: number,
+  data: {
+    name?: string;
+    totalFees?: string;
+    installmentCount?: number;
+    installmentValue?: string;
+    startDate?: number;
+    notes?: string | null;
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(clients)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(clients.id, id));
+}
+
+export async function deleteInstallmentsByClientId(clientId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(installments).where(eq(installments.clientId, clientId));
+}
+
 // ─── Installments ────────────────────────────────────────────────────────────
 
 export async function createInstallments(data: InsertInstallment[]) {
@@ -107,6 +131,36 @@ export async function getInstallmentsByClientId(clientId: number) {
   return db.select().from(installments)
     .where(eq(installments.clientId, clientId))
     .orderBy(asc(installments.number));
+}
+
+export async function updateInstallmentDueDate(id: number, dueDate: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const now = Date.now();
+  // Recalcular status com base na nova data (apenas se não estiver paga)
+  const result = await db.select().from(installments).where(eq(installments.id, id)).limit(1);
+  if (!result[0] || result[0].status === "paid") {
+    await db.update(installments).set({ dueDate, updatedAt: new Date() }).where(eq(installments.id, id));
+    return;
+  }
+  const status = dueDate < now ? "overdue" : "pending";
+  await db.update(installments)
+    .set({ dueDate, status, updatedAt: new Date() })
+    .where(eq(installments.id, id));
+}
+
+// O valor da parcela é armazenado na tabela clients (installmentValue).
+// Esta função atualiza o installmentValue do cliente correspondente à parcela.
+export async function updateInstallmentValue(installmentId: number, newValue: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Buscar o clientId da parcela
+  const inst = await db.select().from(installments).where(eq(installments.id, installmentId)).limit(1);
+  if (!inst[0]) throw new Error("Parcela não encontrada");
+  // Atualizar o valor no cliente
+  await db.update(clients)
+    .set({ installmentValue: newValue, updatedAt: new Date() })
+    .where(eq(clients.id, inst[0].clientId));
 }
 
 export async function markInstallmentPaid(id: number, paidAt: number) {
