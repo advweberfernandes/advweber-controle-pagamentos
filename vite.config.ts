@@ -150,9 +150,15 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
+function normalizeBasePath(value: string | undefined): string {
+  if (!value || value === "/") return "/";
+  return `/${value.replace(/^\/+|\/+$/g, "")}/`;
+}
+
 const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
 
 export default defineConfig({
+  base: normalizeBasePath(process.env.VITE_BASE_PATH),
   plugins,
   resolve: {
     alias: {
@@ -185,3 +191,4 @@ export default defineConfig({
     },
   },
 });
+
