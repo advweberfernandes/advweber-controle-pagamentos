@@ -36,6 +36,19 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+  const rawBasePath = process.env.VITE_BASE_PATH || process.env.BASE_PATH || "";
+  const basePath = rawBasePath && rawBasePath !== "/" ? `/${rawBasePath.replace(/^\/+|\/+$/g, "")}` : "";
+
+  if (basePath) {
+    app.use(
+      `${basePath}/api/trpc`,
+      createExpressMiddleware({
+        router: appRouter,
+        createContext,
+      })
+    );
+  }
+
   // tRPC API
   app.use(
     "/api/trpc",
@@ -44,6 +57,7 @@ async function startServer() {
       createContext,
     })
   );
+
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);

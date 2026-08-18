@@ -23,3 +23,14 @@ export function appPath(path = "/"): string {
     ? `${APP_BASE_PATH}/`
     : `${APP_BASE_PATH}${normalizedPath}`;
 }
+
+/** Builds an API path that respects the application mount point. */
+export function apiPath(path = ""): string {
+  const normalizedPath = path
+    ? path.startsWith("/")
+      ? path
+      : `/${path}`
+    : "";
+
+  return appPath(`/api${normalizedPath}`);
+}
