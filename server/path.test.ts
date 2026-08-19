@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { COOKIE_NAME } from "../shared/const";
 import { apiPath, appPath, APP_BASE_PATH } from "../client/src/lib/app-path";
+import { getLoginUrl } from "../client/src/const";
+
 
 describe("path and cookie helpers", () => {
   it("normalizes root or configured APP_BASE_PATH correctly", () => {
@@ -37,5 +39,12 @@ describe("path and cookie helpers", () => {
     const cleaned = rawHtml.replace(/<script\s+defer\s+src="%VITE_ANALYTICS_ENDPOINT%\/umami"[\s\S]*?<\/script>/gi, "");
     expect(cleaned.includes("%VITE_ANALYTICS_ENDPOINT%")).toBe(false);
   });
+
+  it("handles missing VITE_OAUTH_PORTAL_URL safely without throwing Invalid URL", () => {
+    const url = getLoginUrl();
+    expect(typeof url).toBe("string");
+    expect(url.includes("undefined/app-auth")).toBe(false);
+  });
 });
+
 
