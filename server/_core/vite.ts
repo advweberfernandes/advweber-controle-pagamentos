@@ -62,13 +62,20 @@ export function serveStatic(app: Express) {
   const basePath = rawBasePath && rawBasePath !== "/" ? `/${rawBasePath.replace(/^\/+|\/+$/g, "")}` : "";
 
   if (basePath) {
+    app.use(`${basePath}/assets`, express.static(path.resolve(distPath, "assets"), { maxAge: "1y", immutable: true }));
     app.use(basePath, express.static(distPath));
   }
+  app.use("/assets", express.static(path.resolve(distPath, "assets"), { maxAge: "1y", immutable: true }));
   app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
+  app.use("*", (req, res) => {
+    const reqUrl = req.originalUrl || req.url || "";
+    if (reqUrl.includes("/assets/")) {
+      return res.status(404).type("text/plain").send("Asset not found");
+    }
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
+
 

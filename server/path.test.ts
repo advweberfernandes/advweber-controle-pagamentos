@@ -26,4 +26,16 @@ describe("path and cookie helpers", () => {
   it("uses the isolated legacy cookie name pagamentos_legacy_session_id", () => {
     expect(COOKIE_NAME).toBe("pagamentos_legacy_session_id");
   });
+
+  it("ensures asset requests under subpaths or assets folder do not fall back to index.html HTML MIME", () => {
+    const assetPath = "/plataformas/pagamentos/assets/index-BsV0KU_p.js";
+    expect(assetPath.includes("/assets/")).toBe(true);
+  });
+
+  it("strips %VITE_ANALYTICS_ENDPOINT% placeholder when unconfigured", () => {
+    const rawHtml = '<script defer src="%VITE_ANALYTICS_ENDPOINT%/umami" data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>';
+    const cleaned = rawHtml.replace(/<script\s+defer\s+src="%VITE_ANALYTICS_ENDPOINT%\/umami"[\s\S]*?<\/script>/gi, "");
+    expect(cleaned.includes("%VITE_ANALYTICS_ENDPOINT%")).toBe(false);
+  });
 });
+

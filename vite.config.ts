@@ -155,7 +155,20 @@ function normalizeBasePath(value: string | undefined): string {
   return `/${value.replace(/^\/+|\/+$/g, "")}/`;
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+function vitePluginAnalyticsCleaner(): Plugin {
+  return {
+    name: "analytics-cleaner",
+    transformIndexHtml(html) {
+      if (!process.env.VITE_ANALYTICS_ENDPOINT || process.env.VITE_ANALYTICS_ENDPOINT.includes("%")) {
+        return html.replace(/<script\s+defer\s+src="%VITE_ANALYTICS_ENDPOINT%\/umami"[\s\S]*?<\/script>/gi, "");
+      }
+      return html;
+    },
+  };
+}
+
+const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), vitePluginAnalyticsCleaner()];
+
 
 export default defineConfig({
   base: normalizeBasePath(process.env.VITE_BASE_PATH),
