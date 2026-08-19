@@ -2,7 +2,7 @@ import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, publicProcedure, router } from "./_core/trpc";
 import {
   listClients,
   getClientById,
@@ -27,21 +27,32 @@ import {
 export const appRouter = router({
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+    me: adminProcedure.query(opts => opts.ctx.user),
+    logout: publicProcedure.mutation(async ({ ctx }) => {
+      const rawBaseUrl = process.env.AUTH_CORE_BASE_URL || "https://homologacao.advweber.com";
+      const logoutEndpoint = `${rawBaseUrl.replace(/\/+$/, "")}/plataformas/auth/api/logout`;
+      try {
+        await fetch(logoutEndpoint, {
+          method: "POST",
+          headers: {
+            cookie: ctx.req.headers.cookie || "",
+            accept: "application/json",
+          },
+        });
+      } catch {
+        /* fail closed / ignore logout fetch error */
+      }
       return { success: true } as const;
     }),
   }),
 
   clients: router({
-    list: publicProcedure.query(async () => {
+    list: adminProcedure.query(async () => {
       await syncOverdueInstallments();
       return listClients();
     }),
 
-    getById: publicProcedure
+    getById: adminProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
         await syncOverdueInstallments();
@@ -51,7 +62,7 @@ export const appRouter = router({
         return { ...client, installments };
       }),
 
-    create: publicProcedure
+    create: adminProcedure
       .input(
         z.object({
           name: z.string().min(1, "Nome é obrigatório"),
@@ -98,33 +109,33 @@ export const appRouter = router({
         return newClient;
       }),
 
-    delete: publicProcedure
+    delete: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await deleteClient(input.id);
         return { success: true };
       }),
 
-    listAlpha: publicProcedure.query(async () => {
+    listAlpha: adminProcedure.query(async () => {
       await syncOverdueInstallments();
       return listClientsAlpha();
     }),
 
-    markSettled: publicProcedure
+    markSettled: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await markClientSettled(input.id, Date.now());
         return { success: true };
       }),
 
-    markUnsettled: publicProcedure
+    markUnsettled: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await markClientUnsettled(input.id);
         return { success: true };
       }),
 
-    update: publicProcedure
+    update: adminProcedure
       .input(
         z.object({
           id: z.number(),
@@ -171,7 +182,7 @@ export const appRouter = router({
   }),
 
   installments: router({
-    markPaid: publicProcedure
+    markPaid: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         const paidAt = Date.now();
@@ -179,26 +190,26 @@ export const appRouter = router({
         return { success: true, paidAt };
       }),
 
-    markUnpaid: publicProcedure
+    markUnpaid: adminProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ input }) => {
         await markInstallmentUnpaid(input.id);
         return { success: true };
       }),
 
-    carne: publicProcedure.query(async () => {
+    carne: adminProcedure.query(async () => {
       await syncOverdueInstallments();
       return getAllInstallmentsWithClients();
     }),
 
-    updateDueDate: publicProcedure
+    updateDueDate: adminProcedure
       .input(z.object({ id: z.number(), dueDate: z.number() }))
       .mutation(async ({ input }) => {
         await updateInstallmentDueDate(input.id, input.dueDate);
         return { success: true };
       }),
 
-    updateValue: publicProcedure
+    updateValue: adminProcedure
       .input(z.object({ id: z.number(), value: z.number().positive() }))
       .mutation(async ({ input }) => {
         await updateInstallmentValue(input.id, String(input.value));
@@ -208,3 +219,4 @@ export const appRouter = router({
 });
 
 export type AppRouter = typeof appRouter;
+

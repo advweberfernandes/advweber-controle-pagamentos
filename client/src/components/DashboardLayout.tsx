@@ -47,36 +47,62 @@ export default function DashboardLayout({
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
-  const { loading, user } = useAuth();
+  const { loading, user, isForbidden } = useAuth();
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
   }, [sidebarWidth]);
 
   if (loading) {
-    return <DashboardLayoutSkeleton />
+    return <DashboardLayoutSkeleton />;
   }
 
-  if (!user) {
+  if (isForbidden) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
-          <div className="flex flex-col items-center gap-6">
-            <h1 className="text-2xl font-semibold tracking-tight text-center">
-              Sign in to continue
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="flex flex-col items-center gap-6 p-8 max-w-md w-full border rounded-xl shadow-lg bg-card text-card-foreground text-center">
+          <div className="flex flex-col items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight text-destructive">
+              Acesso Restrito a Administradores
             </h1>
-            <p className="text-sm text-muted-foreground text-center max-w-sm">
-              Access to this dashboard requires authentication. Continue to launch the login flow.
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Esta plataforma é de uso exclusivo de Administradores. Seu perfil de usuário atual não possui autorização para acessar os dados financeiros do Controle de Pagamentos.
             </p>
           </div>
           <Button
             onClick={() => {
-              window.location.href = getLoginUrl();
+              window.location.assign("/plataformas/central");
+            }}
+            size="lg"
+            className="w-full shadow-md transition-all"
+          >
+            Voltar para a Central de Plataformas
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full border rounded-xl shadow-lg bg-card text-card-foreground text-center">
+          <div className="flex flex-col items-center gap-4">
+            <h1 className="text-2xl font-semibold tracking-tight text-center">
+              Autenticação Necessária
+            </h1>
+            <p className="text-sm text-muted-foreground text-center max-w-sm">
+              O acesso a esta plataforma exige uma sessão válida na Central de Plataformas. Clique no botão abaixo para entrar.
+            </p>
+          </div>
+          <Button
+            onClick={() => {
+              window.location.assign("/plataformas/login");
             }}
             size="lg"
             className="w-full shadow-lg hover:shadow-xl transition-all"
           >
-            Sign in
+            Entrar com a Central
           </Button>
         </div>
       </div>
@@ -97,6 +123,7 @@ export default function DashboardLayout({
     </SidebarProvider>
   );
 }
+
 
 type DashboardLayoutContentProps = {
   children: React.ReactNode;
@@ -215,10 +242,11 @@ function DashboardLayoutContent({
                     <p className="text-sm font-medium truncate leading-none">
                       {user?.name || "-"}
                     </p>
-                    <p className="text-xs text-muted-foreground truncate mt-1.5">
-                      {user?.email || "-"}
+                    <p className="text-xs text-muted-foreground truncate mt-1.5 capitalize">
+                      {user?.role || "Administrador"}
                     </p>
                   </div>
+
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">

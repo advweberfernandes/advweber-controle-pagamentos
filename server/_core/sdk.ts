@@ -348,4 +348,83 @@ function buildCronUser(
   } as AuthenticatedUser;
 }
 
+export type CentralAuthUser = {
+  id: number;
+  name: string;
+  role: string;
+};
+
+export type CentralAuthSessionResponse = {
+  authenticated: boolean;
+  user?: CentralAuthUser;
+  permissions?: {
+    processos?: boolean;
+    procuracao?: boolean;
+    pagamentos?: boolean;
+    admin?: boolean;
+  };
+  error?: string;
+};
+
+export type CentralAuthenticatedUser = {
+  id: number;
+  name: string;
+  role: string;
+  isAdmin: boolean;
+};
+
 export const sdk = new SDKServer();
+
+export async function authenticateViaAuthCore(req: Request): Promise<CentralAuthenticatedUser | null> {
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) return null;
+
+  const parsed = parseCookieHeader(cookieHeader);
+  const appSessionToken = parsed["app_session_id"];
+  if (!appSessionToken) return null;
+
+  const rawBaseUrl = process.env.AUTH_CORE_BASE_URL || "https://homologacao.advweber.com";
+  const authCoreBaseUrl = rawBaseUrl.replace(/\/+$/, "");
+  const sessionEndpoint = `${authCoreBaseUrl}/plataformas/auth/api/session`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const res = await fetch(sessionEndpoint, {
+      method: "GET",
+      headers: {
+        cookie: `app_session_id=${encodeURIComponent(appSessionToken)}`,
+        "user-agent": req.headers["user-agent"] || "api-pagamentos-hml",
+        accept: "application/json",
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) return null;
+
+    const data = (await res.json()) as CentralAuthSessionResponse;
+
+    if (!data || data.authenticated !== true || !data.user) return null;
+
+    const userRole = data.user.role;
+    if (typeof userRole !== "string") return null;
+
+    // Regra Canônica do Pagamentos: EXCLUSIVO para Administrador (user.role === "admin")
+    const isAdmin = userRole === "admin";
+    if (!isAdmin) return null;
+
+    return {
+      id: data.user.id,
+      name: data.user.name || "Administrador Central",
+      role: "admin",
+      isAdmin: true,
+    };
+  } catch {
+    clearTimeout(timeoutId);
+    return null;
+  }
+}
+

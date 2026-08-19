@@ -55,7 +55,15 @@ vi.mock("./db", () => ({
   getUserByOpenId: vi.fn().mockResolvedValue(undefined),
 }));
 
-function createPublicContext(): TrpcContext {
+function createAdminContext(): TrpcContext {
+  return {
+    user: { id: 1, name: "Admin Test", role: "admin", isAdmin: true },
+    req: { protocol: "https", headers: {} } as TrpcContext["req"],
+    res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
+  };
+}
+
+function createUnauthenticatedContext(): TrpcContext {
   return {
     user: null,
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
@@ -64,8 +72,14 @@ function createPublicContext(): TrpcContext {
 }
 
 describe("clients.list", () => {
-  it("retorna a lista de clientes", async () => {
-    const ctx = createPublicContext();
+  it("rejeita acesso para requisição não autenticada", async () => {
+    const ctx = createUnauthenticatedContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.clients.list()).rejects.toThrow();
+  });
+
+  it("retorna a lista de clientes para administrador", async () => {
+    const ctx = createAdminContext();
     const caller = appRouter.createCaller(ctx);
     const result = await caller.clients.list();
     expect(Array.isArray(result)).toBe(true);
@@ -74,9 +88,10 @@ describe("clients.list", () => {
   });
 });
 
+
 describe("clients.getById", () => {
   it("retorna cliente com parcelas", async () => {
-    const ctx = createPublicContext();
+    const ctx = createAdminContext();
     const caller = appRouter.createCaller(ctx);
     const result = await caller.clients.getById({ id: 1 });
     expect(result).not.toBeNull();
@@ -88,7 +103,7 @@ describe("clients.getById", () => {
 
 describe("installments.markPaid", () => {
   it("retorna sucesso e registra paidAt automaticamente", async () => {
-    const ctx = createPublicContext();
+    const ctx = createAdminContext();
     const caller = appRouter.createCaller(ctx);
     const before = Date.now();
     const result = await caller.installments.markPaid({ id: 10 });
@@ -101,7 +116,7 @@ describe("installments.markPaid", () => {
 
 describe("installments.markUnpaid", () => {
   it("retorna sucesso ao desfazer pagamento", async () => {
-    const ctx = createPublicContext();
+    const ctx = createAdminContext();
     const caller = appRouter.createCaller(ctx);
     const result = await caller.installments.markUnpaid({ id: 10 });
     expect(result.success).toBe(true);
@@ -110,7 +125,7 @@ describe("installments.markUnpaid", () => {
 
 describe("installments.carne", () => {
   it("retorna parcelas com dados do cliente", async () => {
-    const ctx = createPublicContext();
+    const ctx = createAdminContext();
     const caller = appRouter.createCaller(ctx);
     const result = await caller.installments.carne();
     expect(Array.isArray(result)).toBe(true);

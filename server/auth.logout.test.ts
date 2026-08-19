@@ -46,23 +46,26 @@ describe("auth.logout", () => {
     expect(COOKIE_NAME).toBe("pagamentos_legacy_session_id");
   });
 
-  it("clears the session cookie and reports success", async () => {
-    const { ctx, clearedCookies } = createAuthContext();
-    const caller = appRouter.createCaller(ctx);
+  it("reports success for central logout without clearing central app_session_id directly", async () => {
+    const clearedCookies: CookieCall[] = [];
+    const ctx: TrpcContext = {
+      user: { id: 1, name: "Admin Test", role: "admin", isAdmin: true },
+      req: { protocol: "https", headers: { cookie: "app_session_id=test_cookie" } } as TrpcContext["req"],
+      res: {
+        clearCookie: (name: string, options: Record<string, unknown>) => {
+          clearedCookies.push({ name, options });
+        },
+      } as TrpcContext["res"],
+    };
 
+    const caller = appRouter.createCaller(ctx);
     const result = await caller.auth.logout();
 
     expect(result).toEqual({ success: true });
-    expect(clearedCookies).toHaveLength(1);
-    expect(clearedCookies[0]?.name).toBe(COOKIE_NAME);
-    expect(clearedCookies[0]?.name).toBe("pagamentos_legacy_session_id");
-    expect(clearedCookies[0]?.options).toMatchObject({
-      maxAge: -1,
-      secure: true,
-      sameSite: "none",
-      httpOnly: true,
-      path: "/",
-    });
+    // Pagamentos DOES NOT clear app_session_id directly
+    const clearedAppSession = clearedCookies.find(c => c.name === "app_session_id");
+    expect(clearedAppSession).toBeUndefined();
   });
 });
+
 

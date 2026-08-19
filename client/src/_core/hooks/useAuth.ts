@@ -9,7 +9,7 @@ type UseAuthOptions = {
 };
 
 export function useAuth(options?: UseAuthOptions) {
-  const { redirectOnUnauthenticated = false, redirectPath } =
+  const { redirectOnUnauthenticated = false, redirectPath = "/plataformas/login" } =
     options ?? {};
   const utils = trpc.useUtils();
 
@@ -20,7 +20,10 @@ export function useAuth(options?: UseAuthOptions) {
 
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
-      utils.auth.me.setData(undefined, null);
+      utils.auth.me.setData(undefined, undefined);
+      if (typeof window !== "undefined") {
+        window.location.assign("/plataformas/login");
+      }
     },
   });
 
@@ -30,33 +33,31 @@ export function useAuth(options?: UseAuthOptions) {
     } catch (error: unknown) {
       if (
         error instanceof TRPCClientError &&
-        error.data?.code === "UNAUTHORIZED"
+        (error.data?.code === "UNAUTHORIZED" || error.data?.code === "FORBIDDEN")
       ) {
+        if (typeof window !== "undefined") {
+          window.location.assign("/plataformas/login");
+        }
         return;
       }
       throw error;
     } finally {
-      // Clear the Preview auto-login token mirrored into sessionStorage, so
-      // header-based sessions (Safari ITP / WebView) are logged out too. The
-      // backend cookie is cleared by the logout mutation.
-      try {
-        sessionStorage.removeItem("manus-cookie");
-      } catch {}
-      utils.auth.me.setData(undefined, null);
+      utils.auth.me.setData(undefined, undefined);
       await utils.auth.me.invalidate();
+      if (typeof window !== "undefined") {
+        window.location.assign("/plataformas/login");
+      }
     }
   }, [logoutMutation, utils]);
 
+
   const state = useMemo(() => {
-    localStorage.setItem(
-      "manus-runtime-user-info",
-      JSON.stringify(meQuery.data)
-    );
     return {
       user: meQuery.data ?? null,
       loading: meQuery.isLoading || logoutMutation.isPending,
       error: meQuery.error ?? logoutMutation.error ?? null,
       isAuthenticated: Boolean(meQuery.data),
+      isForbidden: meQuery.error?.data?.code === "FORBIDDEN",
     };
   }, [
     meQuery.data,
@@ -72,10 +73,7 @@ export function useAuth(options?: UseAuthOptions) {
     if (state.user) return;
     if (typeof window === "undefined") return;
 
-    const targetRedirectPath = redirectPath || getLoginUrl();
-    if (!targetRedirectPath || window.location.pathname === targetRedirectPath) return;
-
-    window.location.href = targetRedirectPath;
+    window.location.assign(redirectPath);
   }, [
     redirectOnUnauthenticated,
     redirectPath,
@@ -84,10 +82,10 @@ export function useAuth(options?: UseAuthOptions) {
     state.user,
   ]);
 
-
   return {
     ...state,
     refresh: () => meQuery.refetch(),
     logout,
   };
 }
+
